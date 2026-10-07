@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Einladung zum Klassentreffen</title>
+<meta name="theme-color" content="#2d2f33">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --anthracite: #2d2f33;
+    --anthracite-deep: #212326;
+    --paper: #f7f6f3;
+    --paper-2: #efede8;
+    --paper-3: #e4e1d9;
+    --line: #cfccc2;
+    --ink: #2d2f33;
+    --accent: #a3194b;
+
+    /* Envelope + flyer sizes. Change these to resize everything. */
+    --ew: min(440px, 88vw);
+    --eh: calc(var(--ew) * 0.659);
+    --fw: min(347px, 60vh, 72vw);
+    --fh: calc(var(--fw) * 1.467);
+
+    --t-flap: .8s;
+    --t-rise: .9s;
+    --t-reveal: 1.1s;
+    --t-drop: .45s;          /* envelope slide-down */
+    --drop: 75vh;            /* how far the envelope slides */
+    --ease-in: cubic-bezier(.45, 0, .9, .7);
+    --ease: cubic-bezier(.65, .05, .25, 1);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+
+  body {
+    background:
+      radial-gradient(ellipse at 50% 40%, #383b40 0%, var(--anthracite) 55%, var(--anthracite-deep) 100%);
+    color: var(--ink);
+    font-family: "Newsreader", Georgia, "Times New Roman", serif;
+    overflow: hidden;
+  }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+
+  /* ---------- Scene ---------- */
+  .scene {
+    position: fixed; inset: 0;
+    perspective: 1400px;
+  }
+
+  /* Envelope layers share one box, centred in the viewport */
+  .layer {
+    position: absolute;
+    left: calc(50% - var(--ew) / 2);
+    top:  calc(50% - var(--eh) / 2);
+    width: var(--ew);
+    height: var(--eh);
+    pointer-events: none;
+    transition: translate .25s ease;
+  }
+  .layer svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+  .back  { z-index: 1; filter: drop-shadow(0 18px 28px rgba(0,0,0,.45)); }
+  .front { z-index: 3; }
+
+  /* Flap: rotates around its top edge */
+  .flap {
+    z-index: 4;
+    height: calc(var(--eh) * 0.6);
+    transform-origin: 50% 0;
+    transform-style: preserve-3d;
+    transition:
+      transform var(--t-flap) var(--ease),
+      z-index 0s calc(var(--t-flap) * .45),
+      translate .25s ease;
+  }
+  .flap .face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+  .flap .face.inside { transform: rotateX(180deg); }
+
+  .scene.open .flap { transform: rotateX(180deg); z-index: 1; }
+
+  /* Hover hint before opening */
+  .scene:has(.env-hit:hover):not(.open) :is(.layer, .slot) { translate: 0 -5px; }
+
+  /* Click target */
+  .env-hit {
+    position: absolute; z-index: 6;
+    left: calc(50% - var(--ew) / 2);
+    top:  calc(50% - var(--eh) / 2);
+    width: var(--ew); height: var(--eh);
+    border: 0; padding: 0; background: transparent; cursor: pointer;
+    border-radius: 8px;
+  }
+  .env-hit:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; }
+  .scene.open .env-hit { display: none; }
+
+  .hint {
+    position: absolute; z-index: 2; margin: 0;
+    left: 0; right: 0;
+    top: calc(50% + var(--eh) / 2 + 34px);
+    text-align: center;
+    font-style: italic; font-weight: 300; font-size: 1.05rem;
+    color: #a9acb2; letter-spacing: .02em;
+    pointer-events: none;
+    transition: opacity .4s, visibility 0s .4s;
+  }
+  .scene.open .hint { opacity: 0; visibility: hidden; }
+
+  /* ---------- Slot: clips the flyer while it is inside the envelope ---------- */
+  .slot {
+    position: absolute; z-index: 2;
+    left: calc(50% - var(--ew) / 2);
+    width: var(--ew);
+    height: calc(100vh + var(--eh));
+    top: calc(50% - var(--eh) / 2 - 100vh);
+    /* Clip the flyer at the envelope's bottom edge; the clip slides down
+       together with the envelope so nothing pops into view. */
+    clip-path: inset(0 -100vw 0 -100vw);
+    transition: clip-path var(--t-drop) var(--ease-in), translate .25s ease;
+    pointer-events: none;
+  }
+  .scene.reveal .slot { clip-path: inset(0 -100vw calc(var(--drop) * -1) -100vw); }
+
+  /* ---------- Sheet = flyer + info rail ---------- */
+  .sheet {
+    --y: var(--y0, 0px);
+    --sc: var(--s, .5);
+    position: absolute;
+    left: calc(50% - var(--fw) / 2);
+    bottom: 0;
+    width: var(--fw); height: var(--fh);
+    transform-origin: 50% 100%;
+    transform: translateY(var(--y)) scale(var(--sc));
+    transition: transform var(--t-rise) var(--ease);
+  }
+  .scene.rise   .sheet { --y: var(--y1, 0px); }
+  .scene.reveal .sheet { --y: var(--y2, 0px); --sc: 1; transition-duration: var(--t-reveal); transition-delay: .15s; }
+
+  /* Envelope slides straight down and out of view */
+  .scene.reveal .layer {
+    translate: 0 var(--drop);
+    transition: translate var(--t-drop) var(--ease-in);
+  }
+
+  /* ---------- Flyer ---------- */
+  .paper {
+    position: absolute; inset: 0;
+    background: #f7f5e7;               /* matches the image edge colour */
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 24px 50px rgba(0,0,0,.5);
+  }
+  .paper img { display: block; width: 100%; height: 100%; user-select: none; -webkit-user-drag: none; }
+
+  /* Positions are % of the 1041 x 1527 design */
+  .cal-btn {
+    position: absolute;
+    left: 42.95%; top: 87.95%;
+    width: 11.9%; aspect-ratio: 1;
+    border: 0; padding: 0; border-radius: 50%;
+    background: transparent; cursor: pointer;
+    transition: box-shadow .25s, transform .25s;
+  }
+  .cal-btn:hover { transform: scale(1.06); box-shadow: 0 4px 14px rgba(120,90,55,.35); }
+  .cal-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  /* ---------- Info rail ---------- */
+  .rail {
+    position: absolute;
+    left: calc(100% + 10px);
+    bottom: 0;
+    display: flex; flex-direction: column; gap: 9px;
+    align-items: flex-start;
+    opacity: 0; pointer-events: none;
+    transition: opacity .5s;
+    --pw: min(236px, 64vw);
+  }
+  .scene.reveal .rail { opacity: 1; pointer-events: auto; transition-delay: .7s; }
+
+  .info {
+    width: 40px;
+    background: var(--paper);
+    color: var(--ink);
+    border-radius: 9px;
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow: 0 8px 18px rgba(0,0,0,.35);
+    transition: width .35s var(--ease), background .25s;
+    outline: none;
+  }
+  .info .head { display: flex; align-items: center; height: 40px; }
+  .info .ico {
+    width: 40px; height: 40px; flex: none;
+    display: grid; place-items: center;
+    color: var(--ink); transition: color .25s;
+  }
+  .info .ico svg { width: 22px; height: 22px; }
+  .info .ttl {
+    font-size: 1.05rem; font-weight: 500; white-space: nowrap;
+    opacity: 0; transition: opacity .2s;
+  }
+  .info .more {
+    display: grid; grid-template-rows: 0fr;
+    transition: grid-template-rows .35s var(--ease);
+  }
+  .info .more > div { overflow: hidden; min-height: 0; }
+  .info .more p {
+    width: var(--pw); margin: 0; padding: 2px 14px 14px;
+    font-size: .98rem; line-height: 1.45;
+  }
+
+  .info:hover, .info:focus-visible, .info.active { width: var(--pw); }
+  .info:hover .ttl, .info:focus-visible .ttl, .info.active .ttl { opacity: 1; transition-delay: .1s; }
+  .info:hover .more, .info:focus-visible .more, .info.active .more { grid-template-rows: 1fr; }
+  .info:hover .ico, .info:focus-visible .ico, .info.active .ico { color: var(--accent); }
+  .info:focus-visible { box-shadow: 0 0 0 2px var(--accent), 0 8px 18px rgba(0,0,0,.35); }
+
+  /* ---------- Small screens: rail sits inside the flyer, opens leftwards ---------- */
+  @media (max-width: 640px) {
+    :root { --fw: min(347px, 78vw, 56vh); }
+    .rail { left: auto; right: 10px; bottom: 10px; align-items: flex-end; }
+    .info { box-shadow: 0 4px 12px rgba(0,0,0,.25); border: 1px solid var(--line); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :root { --t-flap: .01s; --t-rise: .01s; --t-reveal: .01s; --t-drop: .01s; }
+    .info, .info .more, .rail { transition-duration: .01s; }
+  }
+</style>
+</head>
+
+<body>
+<h1 class="sr-only">Einladung zum Klassentreffen</h1>
+
+<main class="scene" id="scene">
+
+  <!-- Envelope: back -->
+  <div class="layer back" aria-hidden="true">
+    <svg viewBox="0 0 440 290" preserveAspectRatio="none">
+      <rect width="440" height="290" rx="6" fill="#dcd9d1"/>
+    </svg>
+  </div>
+
+  <!-- Flyer slot -->
+  <div class="slot" id="slot">
+    <div class="sheet" id="sheet">
+
+      <!-- ===== FLYER: flyer.png (1041 x 1527). Swap the file to change the design ===== -->
+      <article class="paper">
+        <img src="flyer.png" alt="Einladung zum Klassentreffen, Jahrgang 2017: Samstag, 24. April 2027, ab 17:00 Uhr im WELTRAD, Cokturhof 3, 39218 Schönebeck (Elbe)" draggable="false">
+        <!-- Invisible button laid over the calendar icon in the design -->
+        <button class="cal-btn" id="cal" aria-label="Termin zum Kalender hinzufügen"></button>
+      </article>
+      <!-- ===== /FLYER ===== -->
+
+      <!-- Info icons: add or remove .info blocks as you like -->
+      <div class="rail">
+        <div class="info" tabindex="0" aria-label="Übernachtung">
+          <div class="head">
+            <span class="ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18V6"/><path d="M3 14h18v4"/><path d="M21 14v-2a3 3 0 0 0-3-3h-7v5"/><circle cx="7" cy="11" r="1.6"/></svg>
+            </span>
+            <span class="ttl">Übernachtung</span>
+          </div>
+          <div class="more"><div><p>Platzhalter: Zimmerkontingent im Hotel Beispiel, Stichwort „Klassentreffen“, buchbar bis TT.MM.</p></div></div>
+        </div>
+
+        <div class="info" tabindex="0" aria-label="Anreise">
+          <div class="head">
+            <span class="ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>
+            </span>
+            <span class="ttl">Anreise</span>
+          </div>
+          <div class="more"><div><p>Platzhalter: Vom Hauptbahnhof mit Bus 12 bis „Beispielstraße“, dann zwei Minuten zu Fuß.</p></div></div>
+        </div>
+
+        <div class="info" tabindex="0" aria-label="Parken">
+          <div class="head">
+            <span class="ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="16" height="17" rx="3"/><path d="M9.5 17v-9.5h3.2a2.9 2.9 0 0 1 0 5.8H9.5"/></svg>
+            </span>
+            <span class="ttl">Parken</span>
+          </div>
+          <div class="more"><div><p>Platzhalter: Kostenlose Parkplätze direkt hinter dem Gebäude. Weitere Plätze am Marktplatz (5 Minuten Fußweg).</p></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Envelope: front pocket -->
+  <div class="layer front" aria-hidden="true">
+    <svg viewBox="0 0 440 290" preserveAspectRatio="none">
+      <g stroke="#cfccc2" stroke-width=".8" stroke-linejoin="round">
+        <polygon points="0,0 228,168 0,290"   fill="#efede8"/>
+        <polygon points="440,0 212,168 440,290" fill="#ebe8e2"/>
+        <polygon points="0,290 220,148 440,290" fill="#f7f6f3"/>
+      </g>
+    </svg>
+  </div>
+
+  <!-- Envelope: flap -->
+  <div class="layer flap" aria-hidden="true">
+    <div class="face outside">
+      <svg viewBox="0 0 440 174" preserveAspectRatio="none">
+        <polygon points="0,0 440,0 220,172" fill="#fbfaf8" stroke="#cfccc2" stroke-width=".8" stroke-linejoin="round"/>
+        <circle cx="220" cy="150" r="17" fill="#a3194b"/>
+        <circle cx="220" cy="150" r="12.5" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1"/>
+        <text x="220" y="155.5" text-anchor="middle" font-family="Newsreader, Georgia, serif" font-size="15" fill="#fff" font-style="italic">K</text>
+      </svg>
+    </div>
+    <div class="face inside">
+      <svg viewBox="0 0 440 174" preserveAspectRatio="none">
+        <polygon points="0,172 440,172 220,0" fill="#e4e1d9" stroke="#cfccc2" stroke-width=".8" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </div>
+
+  <button class="env-hit" id="open" aria-label="Umschlag öffnen"></button>
+  <p class="hint">Zum Öffnen anklicken</p>
+</main>
+
+<script>
+(() => {
+  const scene = document.getElementById('scene');
+  const sheet = document.getElementById('sheet');
+  const back  = scene.querySelector('.back');
+  const openBtn = document.getElementById('open');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Work out where the flyer sits inside / above / outside the envelope.
+  function layout() {
+    const ew = back.offsetWidth, eh = back.offsetHeight;
+    const fw = sheet.offsetWidth, fh = sheet.offsetHeight;
+    const s  = (ew * 0.8) / fw;          // flyer scale while inside the envelope
+    const h  = fh * s;
+    const y0 = h - eh * 0.78;            // tucked in
+    const y1 = y0 - eh * 0.85;           // risen out of the pocket
+    const y2 = fh / 2 - eh / 2;          // centred on screen at full size
+    const st = sheet.style;
+    st.setProperty('--s',  s);
+    st.setProperty('--y0', y0 + 'px');
+    st.setProperty('--y1', y1 + 'px');
+    st.setProperty('--y2', y2 + 'px');
+  }
+  layout();
+  addEventListener('resize', layout);
+  document.fonts && document.fonts.ready.then(layout);
+
+  // Open sequence: flap opens -> flyer rises -> flyer comes forward
+  openBtn.addEventListener('click', () => {
+    scene.classList.add('open');
+    setTimeout(() => scene.classList.add('rise'),   reduce ? 0 : 750);
+    setTimeout(() => scene.classList.add('reveal'), reduce ? 0 : 1650);
+  });
+
+
+  // "Add to calendar": builds an .ics file on the fly
+  document.getElementById('cal').addEventListener('click', e => {
+    e.stopPropagation();
+    const ics = [
+      'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Klassentreffen//DE','BEGIN:VEVENT',
+      'UID:klassentreffen-2017-20270424@weltrad',
+      'DTSTAMP:20260101T000000Z',
+      'DTSTART:20270424T150000Z',   // 17:00 Uhr MESZ
+      'DTEND:20270424T220000Z',     // 00:00 Uhr MESZ (Ende bitte anpassen)
+      'SUMMARY:Klassentreffen Jahrgang 2017',
+      'LOCATION:WELTRAD\\, Cokturhof 3\\, 39218 Schönebeck (Elbe)',
+      'DESCRIPTION:Klassentreffen Jahrgang 2017 – Dr.-Carl-Hermann-Gymnasium',
+      'END:VEVENT','END:VCALENDAR'
+    ].join('\r\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([ics], {type: 'text/calendar;charset=utf-8'}));
+    a.download = 'klassentreffen.ics';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+
+  // Info tiles: hover/focus work in CSS; tap toggles for touch screens
+  const tiles = [...document.querySelectorAll('.info')];
+  tiles.forEach(t => t.addEventListener('click', e => {
+    e.stopPropagation();
+    const on = !t.classList.contains('active');
+    tiles.forEach(o => o.classList.remove('active'));
+    t.classList.toggle('active', on);
+  }));
+  document.addEventListener('click', () => tiles.forEach(o => o.classList.remove('active')));
+})();
+</script>
+</body>
+</html>
